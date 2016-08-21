@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+
+
+function usage() {
+    echo "usage: git-open [-h]"
+}
+
+
+function die() {
+    local -i exit_code=1
+    [[ $1 = -* ]] && exit_code=${1#-} && shift
+    echo $*
+    exit ${exit_code}
+}
+
+
+while true
+do
+    case "${1}" in
+        -h|--help)
+            usage
+            exit
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
+
+
+which -s git || die -9 "fatal: git not found; please install git before using this tool"
+git status &>/dev/null || die -9 "fatal: ${PWD} is not in a git repo"
+
+
+# Identify which remote our working copy is using
+line=$(git status -sb | grep -F "...")
+[ -n "${line}" ] || die "fatal: git status does not provide an associated remote"
+
+remote=$(echo ${line} | sed -nE -e 's#^.*\.\.\.([a-zA-z]+)/.*$#\1#p')
+[ -n "${remote}" ] || die "fatal: unable to determine remote for working copy"
+echo "remote=$remote"
+
+# Git the remote URL and munch it into an HTTP/HTTPS URL
+url=$(git remote get-url ${remote})
+[ -n "${url}" ] || die "fatal: missing remote URL"
+
+
+# Fixup URL
+[[ ${url} = *.git ]] && url=${url%.git}
+if [[ $url = git@* ]]
+then
+    host="${url#git@}"
+    host="${host%%:*}"
+    path="${url#*:}"
+    url="https://${host}/${path}"
+fi
+
+
+open "${url}"
